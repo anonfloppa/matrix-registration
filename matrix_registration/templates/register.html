@@ -42,11 +42,12 @@
     <div class="center">
       <header>
         <h1>{{ translations.server_registration }}</h1>
-        <p>{{ translations.requires_token }}<br>
+        <p>{{ translations.requires_captcha }}<br>
           {{ translations.requires_username_and_password }}</p>
       </header>
       <section>
         <form id="registration" action="{{ base_url }}/register" method="post">
+          <input type="hidden" id="captcha_token" name="captcha_token" value="{{ captcha_token }}" />
           <div class="group">
             <input id="username" name="username" type="text" placeholder=" "
               pattern="^@?[a-zA-Z_\-=\.\/0-9]+(:{{ server_name|replace('.', '\.') }})?$" 
@@ -69,10 +70,13 @@
             <label for="confirm_password">{{ translations.confirm }}</label>
           </div>
           <div class="group">
-            <input id="token" name="token" type="text" placeholder=" " required pattern="^([A-Z][a-z]+)+$">
+            <input id="captcha_answer" name="captcha_answer" type="text" placeholder=" " required >
             <span class="highlight"></span>
             <span class="bar"></span>
-            <label for="token">{{ translations.token }}</label>
+            <label for="captcha_answer">{{ translations.captcha }}</label>
+          </div>
+          <div>
+            <img id="captcha_image" src="data:image/png;base64,{{ captcha_image }}" />
           </div>
           <div class="btn-box">
             <input class="btn btn-submit" type="submit" value="{{ translations.register }}">
@@ -118,7 +122,6 @@
     /* 
     What this script does:
       - confirm password validator needs javascript, otherwise always valid as long as not empty
-      - set token with ?token query parameter
       - set custom validity messages
     */
 
@@ -140,22 +143,10 @@
 
     const isVisible = elem => !!elem && !!(elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length)
 
-    // set token input to "?token=" query parameter
-    const urlParams = new URLSearchParams(window.location.search)
-    document.getElementById("token").value = urlParams.get("token")
-
-    // set "?lang=" parameter to user lang
-    const userLang = navigator.language || navigator.userLanguage
-    if (!urlParams.has("lang")) { 
-      urlParams.append("lang", userLang)
-      window.history.replaceState({}, '', `${location.pathname}?${urlParams}`);
-    }
-
     // html5 validators
     var username = document.getElementById("username")
     var password = document.getElementById("password")
     var confirm_password = document.getElementById("confirm_password")
-    var token = document.getElementById("token")
 
     username.addEventListener("input", function (event) {
       if (username.validity.patternMismatch) {
@@ -175,14 +166,6 @@
           }
         {% endfor %}
         username.setCustomValidity("")
-      }
-    })
-
-    token.addEventListener("input", function (event) {
-      if (token.validity.patternMismatch) {
-        token.setCustomValidity("{{ translations.case_sensitive }}")
-      } else {
-        token.setCustomValidity("")
       }
     })
 
@@ -221,7 +204,6 @@
 
       // Bind the FormData object and the form element
       let FD = new FormData(form)
-
       // Define what happens on successful data submission
       XHR.addEventListener("load", function (event) {
         console.log(XHR.responseText)
@@ -236,13 +218,15 @@
         }
         if ("errcode" in response) {
           if (response["errcode"] == "MR_BAD_USER_REQUEST") {
-            if ("token" in response["error"]) {
-              showError(" {{ translations.token_error }} ", response["error"]["token"][0])
+            if ("captcha_answer" in response["error"]) {
+              showError(" {{ translations.captcha_error }} ", response["error"]["captcha_answer"][0])
             } else if ("password" in response["error"]) {
               showError("{{ translations.password_error }}", response["error"]["password"][0])
             } else if ("username" in response["error"]) {
               showError("{{ translations.username_error }}", response["error"]["username"][0])
             }
+            document.getElementById("captcha_image").src = "data:image/png;base64," + response["captcha_image"]
+            document.getElementById("captcha_token").value = response["captcha_token"]
             return
           } else {
             showError("{{ translations.homeserver_error }}", response["error"])

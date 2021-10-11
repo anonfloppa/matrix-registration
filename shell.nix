@@ -13,8 +13,8 @@ in buildPythonPackage {
   src = ./.;
   propagatedBuildInputs = [
     pkgs.libsndfile
-    alembic
     appdirs
+    captcha
     flask
     flask-cors
     flask-httpauth

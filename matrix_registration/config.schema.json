@@ -12,9 +12,6 @@
     "registration_shared_secret": {
       "type": "string"
     },
-    "admin_api_shared_secret": {
-      "type": "string"
-    },
     "base_url": {
       "type": "string"
     },
@@ -22,9 +19,6 @@
       "type": "string"
     },
     "client_logo": {
-      "type": "string"
-    },
-    "db": {
       "type": "string"
     },
     "host": {
@@ -43,9 +37,6 @@
       }
     },
     "allow_cors": {
-      "type": "boolean"
-    },
-    "ip_logging": {
       "type": "boolean"
     },
     "logging": {
@@ -82,24 +73,29 @@
         "validation_regex",
         "invalidation_regex"
       ]
+    },
+    "captcha_length": {
+      "type": "integer"
+    },
+    "captcha_timeout": {
+      "type": "integer"
     }
   },
   "required": [
     "server_location",
     "server_name",
     "registration_shared_secret",
-    "admin_api_shared_secret",
     "base_url",
     "client_redirect",
     "client_logo",
-    "db",
     "host",
     "port",
     "rate_limit",
     "allow_cors",
-    "ip_logging",
     "logging",
     "password",
-    "username"
+    "username",
+    "captcha_length",
+    "captcha_timeout"
   ]
 }

@@ -19,11 +19,12 @@ from flask import (
 from flask_httpauth import HTTPTokenAuth
 from werkzeug.exceptions import BadRequest
 from wtforms import Form, StringField, PasswordField, validators
+from wtforms.fields.simple import HiddenField
 
 # Local imports...
 from .matrix_api import create_account
 from . import config
-from . import tokens
+from . import captcha
 from .constants import __location__
 from .translation import get_translations
 
@@ -34,25 +35,24 @@ logger = logging.getLogger(__name__)
 api = Blueprint("api", __name__)
 
 
-def validate_token(form, token):
+def validate_captcha(form, captcha_answer):
     """
-    validates token
+    validates captcha
 
     Parameters
     ----------
     arg1 : Form object
     arg2 : str
-        token name, e.g. 'DoubleWizardSki'
+        captcha name, e.g. 'DoubleWizardSki'
 
     Raises
     -------
     ValidationError
-        Token is invalid
+        captcha is invalid
 
     """
-    tokens.tokens.load()
-    if not tokens.tokens.active(token.data):
-        raise validators.ValidationError("Token is invalid")
+    if not captcha.captcha.validate(captcha_answer.data, form.captcha_token.data):
+        raise validators.ValidationError("captcha is invalid")
 
 
 def validate_username(form, username):
@@ -136,22 +136,8 @@ class RegistrationForm(Form):
         ],
     )
     confirm = PasswordField("Repeat Password")
-    token = StringField(
-        "Token", [validators.Regexp(r"^([A-Z][a-z]+)+$"), validate_token]
-    )
-
-
-@auth.verify_token
-def verify_token(token):
-    return (
-        token != "APIAdminPassword" and token == config.config.admin_api_shared_secret
-    )
-
-
-@auth.error_handler
-def unauthorized():
-    resp = {"errcode": "MR_BAD_SECRET", "error": "wrong shared secret"}
-    return make_response(jsonify(resp), 401)
+    captcha_answer = StringField("Captcha answer", [validate_captcha])
+    captcha_token = HiddenField("Captcha token")
 
 
 @api.route("/static/replace/images/element-logo.png")
@@ -171,7 +157,8 @@ def register():
       - username
       - password
       - confirm
-      - token
+      - captcha_answer
+      - captcha_token
     as described in the RegistrationForm
     """
     if request.method == "POST":
@@ -213,10 +200,6 @@ def register():
                     logger.error("failure communicating with HS", exc_info=True)
                 abort(500)
 
-            logger.debug("using token %s" % form.token.data)
-            ip = request.remote_addr if config.config.ip_logging else False
-            tokens.tokens.use(form.token.data, ip)
-
             logger.debug("account creation succeded!")
             return jsonify(
                 access_token=account_data["access_token"],
@@ -227,11 +210,14 @@ def register():
             )
         else:
             logger.debug("account creation failed!")
-            resp = {"errcode": "MR_BAD_USER_REQUEST", "error": form.errors}
+            captcha_data = captcha.captcha.generate()
+            resp = {
+                "errcode": "MR_BAD_USER_REQUEST",
+                "error": form.errors,
+                "captcha_image": captcha_data["captcha_image"].decode(),
+                "captcha_token": captcha_data["captcha_token"]
+            }
             return make_response(jsonify(resp), 400)
-            # for fieldName, errorMessages in form.errors.items():
-            #     for err in errorMessages:
-            #         # return error to user
     else:
         server_name = config.config.server_name
         pw_length = config.config.password["min_length"]
@@ -240,6 +226,7 @@ def register():
         lang = request.args.get("lang") or request.accept_languages.best
         replacements = {"server_name": server_name, "pw_length": pw_length}
         translations = get_translations(lang, replacements)
+        captcha_data = captcha.captcha.generate()
         return render_template(
             "register.html",
             server_name=server_name,
@@ -249,89 +236,11 @@ def register():
             client_redirect=config.config.client_redirect,
             base_url=config.config.base_url,
             translations=translations,
+            captcha_token=captcha_data["captcha_token"],
+            captcha_image=captcha_data["captcha_image"].decode()
         )
 
 
 @api.route("/health")
 def health():
     return make_response("OK", 200)
-
-
-@api.route("/api/version")
-@auth.login_required
-def version():
-    with open(os.path.join(__location__, "__init__.py"), "r") as file:
-        version_file = file.read()
-        version_match = re.search(
-            r"^__version__ = ['\"]([^'\"]*)['\"]", version_file, re.M
-        )
-        resp = {"version": version_match.group(1)}
-        return make_response(jsonify(resp), 200)
-
-
-@api.route("/api/token", methods=["GET", "POST"])
-@auth.login_required
-def token():
-    tokens.tokens.load()
-
-    data = False
-    max_usage = False
-    expiration_date = None
-    if request.method == "GET":
-        return jsonify(tokens.tokens.toList())
-    elif request.method == "POST":
-        data = request.get_json()
-        try:
-            if data:
-                if "expiration_date" in data and data["expiration_date"] is not None:
-                    expiration_date = datetime.fromisoformat(data["expiration_date"])
-                if "max_usage" in data:
-                    max_usage = data["max_usage"]
-                token = tokens.tokens.new(
-                    expiration_date=expiration_date, max_usage=max_usage
-                )
-        except ValueError:
-            resp = {
-                "errcode": "MR_BAD_DATE_FORMAT",
-                "error": "date wasn't in YYYY-MM-DD format",
-            }
-            return make_response(jsonify(resp), 400)
-        return jsonify(token.toDict())
-    resp = {"errcode": "MR_BAD_USER_REQUEST", "error": "malformed request"}
-    return make_response(jsonify(resp), 400)
-
-
-@api.route("/api/token/<token>", methods=["GET", "PATCH"])
-@auth.login_required
-def token_status(token):
-    tokens.tokens.load()
-    data = False
-    if request.method == "GET":
-        if tokens.tokens.get_token(token):
-            return jsonify(tokens.tokens.get_token(token).toDict())
-        else:
-            resp = {"errcode": "MR_TOKEN_NOT_FOUND", "error": "token does not exist"}
-            return make_response(jsonify(resp), 404)
-    elif request.method == "PATCH":
-        try:
-            data = request.get_json(force=True)
-        except BadRequest as e:
-            # empty request means use default values
-            if len(request.get_data()) == 0:
-                data = None
-            else:
-                raise e
-        if data:
-            if "ips" not in data and "active" not in data and "name" not in data:
-                if tokens.tokens.update(token, data):
-                    return jsonify(tokens.tokens.get_token(token).toDict())
-            else:
-                resp = {
-                    "errcode": "MR_BAD_USER_REQUEST",
-                    "error": "you're not allowed to change this property",
-                }
-                return make_response(jsonify(resp), 400)
-            resp = {"errcode": "MR_TOKEN_NOT_FOUND", "error": "token does not exist"}
-            return make_response(jsonify(resp), 404)
-    resp = {"errcode": "MR_BAD_USER_REQUEST", "error": "malformed request"}
-    return make_response(jsonify(resp), 400)
