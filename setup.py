@@ -54,10 +54,8 @@ setuptools.setup(
         "waitress>=2.0.0",
         "WTForms>=2.1"
     ],
-    tests_require=test_requirements,
     extras_require={
         "postgres":  ["psycopg2-binary>=2.8.4"],
-        "testing": test_requirements
     },
     classifiers=[
         "Development Status :: 4 - Beta",
