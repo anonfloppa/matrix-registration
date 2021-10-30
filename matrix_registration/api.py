@@ -14,20 +14,19 @@ from flask import (
     make_response,
     render_template
 )
-from flask_httpauth import HTTPTokenAuth
 from wtforms import (
     Form,
     StringField,
     PasswordField,
     validators
 )
+from wtforms.fields.simple import HiddenField
 
 # Local imports...
 from .matrix_api import create_account
 from . import config
-from . import tokens
+from . import captcha
 
-auth = HTTPTokenAuth(scheme='SharedSecret')
 logger = logging.getLogger(__name__)
 
 api = Blueprint("api", __name__)
@@ -35,25 +34,21 @@ api = Blueprint("api", __name__)
 re_mxid = re.compile(r'^@?[a-zA-Z_\-=\.\/0-9]+(:[a-zA-Z\-\.:\/0-9]+)?$')
 
 
-def validate_token(form, token):
+def validate_captcha(form, captcha_answer):
     """
-    validates token
-
+    validates captcha
     Parameters
     ----------
     arg1 : Form object
     arg2 : str
-        token name, e.g. 'DoubleWizardSki'
-
+        captcha answer, e.g. '4tg'
     Raises
     -------
     ValidationError
-        Token is invalid
-
+        captcha is invalid
     """
-    tokens.tokens.load()
-    if not tokens.tokens.valid(token.data):
-        raise validators.ValidationError('Token is invalid')
+    if not captcha.captcha.validate(captcha_answer.data, form.captcha_token.data):
+        raise validators.ValidationError("captcha is invalid")
 
 
 def validate_username(form, username):
@@ -118,24 +113,8 @@ class RegistrationForm(Form):
         validators.EqualTo('confirm', message='Passwords must match')
     ])
     confirm = PasswordField('Repeat Password')
-    token = StringField('Token', [
-        validators.Regexp(r'^([A-Z][a-z]+)+$'),
-        validate_token
-    ])
-
-
-@auth.verify_token
-def verify_token(token):
-    return token == config.config.admin_secret
-
-
-@auth.error_handler
-def unauthorized():
-    resp = {
-                'errcode': 'MR_BAD_SECRET',
-                'error': 'wrong shared secret'
-            }
-    return make_response(jsonify(resp), 401)
+    captcha_answer = StringField("Captcha answer", [validate_captcha])
+    captcha_token = HiddenField("Captcha token")
 
 
 @api.route('/register', methods=['GET', 'POST'])
@@ -147,8 +126,9 @@ def register():
       - username
       - password
       - confirm
-      - token
-    as described in the RegistrationForm
+      - captcha_answer
+      - captcha_token
+     as described in the RegistrationForm
     """
     if request.method == 'POST':
         logger.debug('an account registration started...')
@@ -188,7 +168,6 @@ def register():
                                  exc_info=True)
                 abort(500)
             logger.debug('account creation succeded!')
-            tokens.tokens.use(form.token.data)
             return jsonify(access_token=account_data['access_token'],
                            home_server=account_data['home_server'],
                            user_id=account_data['user_id'],
@@ -196,8 +175,12 @@ def register():
                            status_code=200)
         else:
             logger.debug('account creation failed!')
+            captcha_data = captcha.captcha.generate()
             resp = {'errcode': 'MR_BAD_USER_REQUEST',
-                    'error': form.errors}
+                    'error': form.errors,
+                    "captcha_image": captcha_data["captcha_image"].decode(),
+                    "captcha_token": captcha_data["captcha_token"]
+                    }
             return make_response(jsonify(resp), 400)
             # for fieldName, errorMessages in form.errors.items():
             #     for err in errorMessages:
@@ -205,72 +188,11 @@ def register():
     else:
         server_name = config.config.server_name
         pw_length = config.config.password['min_length']
+        captcha_data = captcha.captcha.generate()
         return render_template('register.html',
                                server_name=server_name,
                                pw_length=pw_length,
                                riot_instance=config.config.riot_instance,
-                               base_url=config.config.base_url)
-
-
-@api.route('/token', methods=['GET', 'POST'])
-@auth.login_required
-def token():
-    tokens.tokens.load()
-
-    data = False
-    one_time = False
-    ex_date = None
-    if request.method == 'GET':
-        return jsonify(tokens.tokens.toList())
-    elif request.method == 'POST':
-        data = request.get_json()
-        try:
-            if data:
-                if 'ex_date' in data and data['ex_date'] is not None:
-                    ex_date = parser.parse(data['ex_date'])
-                if 'one_time' in data:
-                    one_time = data['one_time']
-                token = tokens.tokens.new(ex_date=ex_date,
-                                          one_time=one_time)
-        except ValueError:
-            resp = {
-                'errcode': 'MR_BAD_DATE_FORMAT',
-                'error': "date wasn't YYYY-MM-DD format"
-            }
-            return make_response(jsonify(resp), 400)
-        return jsonify(token.toDict())
-    abort(400)
-
-
-@api.route('/token/<token>', methods=['GET', 'PUT'])
-@auth.login_required
-def token_status(token):
-    tokens.tokens.load()
-    data = False
-    if request.method == 'GET':
-        if tokens.tokens.get_token(token):
-            return jsonify(tokens.tokens.get_token(token).toDict())
-        else:
-            resp = {
-                'errcode': 'MR_TOKEN_NOT_FOUND',
-                'error': 'token does not exist'
-            }
-            return make_response(jsonify(resp), 404)
-    elif request.method == 'PUT':
-        data = request.get_json(force=True)
-        if data:
-            if not data['disable']:
-                resp = {
-                    'errcode': 'MR_BAD_USER_REQUEST',
-                    'error': 'PUT only allows "disable": true'
-                }
-                return make_response(jsonify(resp), 400)
-            else:
-                if tokens.tokens.disable(token):
-                    return jsonify(tokens.tokens.get_token(token).toDict())
-            resp = {
-                'errcode': 'MR_TOKEN_NOT_FOUND',
-                'error': 'token does not exist or is already disabled'
-            }
-            return make_response(jsonify(resp), 404)
-    abort(400)
+                               base_url=config.config.base_url,
+                               captcha_token=captcha_data["captcha_token"],
+                               captcha_image=captcha_data["captcha_image"].decode())

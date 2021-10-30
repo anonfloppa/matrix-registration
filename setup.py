@@ -46,6 +46,7 @@ setuptools.setup(
     python_requires='~=3.6',
     install_requires=[
         "appdirs~=1.4.3",
+        "captcha>=0.3",
         "Flask~=1.1",
         "Flask-SQLAlchemy~=2.4.1",
         "flask-cors~=3.0.7",

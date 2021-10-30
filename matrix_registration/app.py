@@ -10,9 +10,9 @@ from flask_limiter.util import get_ipaddr
 from flask_cors import CORS
 from waitress import serve
 
+from . import captcha
+from .captcha import db
 from . import config
-from . import tokens
-from .tokens import db
 import os
 
 def create_app(testing=False):
@@ -41,7 +41,7 @@ def cli(info, config_path):
         )
         db.init_app(app)
         db.create_all()
-        tokens.tokens = tokens.Tokens()
+        captcha.captcha = captcha.CaptchaGenerator()
 
 
 @cli.command("serve", help="start api server")
@@ -58,30 +58,6 @@ def run_server(info):
     serve(app, host=config.config.host, port=config.config.port, url_prefix=config.config.base_url)
 
 
-@cli.command("generate", help="generate new token")
-@click.option("-o", "--one-time", is_flag=True, help="make token one-time-useable")
-@click.option("-e", "--expires", type=click.DateTime(formats=["%Y-%m-%d"]), default=None, help='expire date: in ISO-8601 format (YYYY-MM-DD)')
-def generate_token(one_time, expires):
-    token = tokens.tokens.new(ex_date=expires, one_time=one_time)
-    print(token.name)
-
-
-@cli.command("status", help="view status or disable")
-@click.option("-s", "--status", default=None, help="token status")
-@click.option("-l", "--list", is_flag=True, help="list tokens")
-@click.option("-d", "--disable", default=None, help="disable token")
-def status_token(status, list, disable):
-    if disable:
-        if tokens.tokens.disable(disable):
-            print("Token disabled")
-        else:
-            print("Token couldn't be disabled")
-    if status:
-        token = tokens.tokens.get_token(status)
-        if token:
-            print(f"This token is{' ' if token.valid else ' not '}valid")
-            print(json.dumps(token.toDict(), indent=2))
-        else:
-            print("No token with that name")
-    if list:
-        print(tokens.tokens)
+if __name__ == "__main__":
+    cli()
+    run_server()
