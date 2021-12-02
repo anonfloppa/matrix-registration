@@ -7,7 +7,7 @@ riot_instance: 'https://riot.im/app/'
 db: 'sqlite:///{cwd}db.sqlite3'
 host: 'localhost'
 port: 5000
-rate_limit: ["100 per day", "10 per minute"]
+rate_limit: ["10000 per day", "100 per minute"]
 allow_cors: false
 logging:
   disable_existing_loggers: False
