@@ -31,7 +31,12 @@ class CaptchaGenerator:
 
     def validate(self, captcha_answer, captcha_token):
         self.clean()
-        cpt = Captcha.query.filter(Captcha.token==captcha_token).one()
+        try:
+            cpt = Captcha.query.filter(Captcha.token==captcha_token).one()
+        except:
+            # when the user stay on the page too long the captcha is removed
+            return False
+
         if cpt:
             answer = cpt.answer
             db.session.delete(cpt)
