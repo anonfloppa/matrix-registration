@@ -57,7 +57,8 @@ setuptools.setup(
         "requests>=2.22",
         "SQLAlchemy>=1.3.13,<1.4",
         "waitress~=1.4.4",
-        "WTForms~=2.1"
+        "WTForms~=2.1",
+        "markupsafe==2.0.1"
     ],
     tests_require=test_requirements,
     extras_require={
