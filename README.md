@@ -24,7 +24,7 @@ Add the following to your inventory/hosts_vars/matrix.HOMESERVER/vars.yml file:
 matrix_registration_enabled: true
 matrix_registration_admin_secret: "null" # not needed by this fork but required by the playbook
 matrix_registration_docker_image: "{{ matrix_registration_docker_image_name_prefix }}anonfloppa/matrix-registration:{{ matrix_registration_version }}"
-matrix_registration_version: "v0.7.2.2"
+matrix_registration_version: "v0.7.2.3"
 ```
 
 the registration page will be available at https://matrix.HOMESERVER/matrix-registration/register
