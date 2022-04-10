@@ -5,21 +5,9 @@ import re
 from urllib.parse import urlparse
 
 # Third-party imports...
-from dateutil import parser
-from flask import (
-    Blueprint,
-    abort,
-    jsonify,
-    request,
-    make_response,
-    render_template
-)
-from wtforms import (
-    Form,
-    StringField,
-    PasswordField,
-    validators
-)
+from flask import (Blueprint, abort, jsonify, request, make_response,
+                   render_template)
+from wtforms import (Form, StringField, PasswordField, validators)
 from wtforms.fields.simple import HiddenField
 
 # Local imports...
@@ -47,7 +35,8 @@ def validate_captcha(form, captcha_answer):
     ValidationError
         captcha is invalid
     """
-    if not captcha.captcha.validate(captcha_answer.data, form.captcha_token.data):
+    if not captcha.captcha.validate(captcha_answer.data,
+                                    form.captcha_token.data):
         raise validators.ValidationError("captcha is invalid")
 
 
@@ -101,17 +90,21 @@ class RegistrationForm(Form):
 
     validates user account registration requests
     """
-    username = StringField('Username', [
-        validators.Length(min=1, max=200),
-        # validators.Regexp(re_mxid)
-        validate_username
-    ])
-    password = PasswordField('New Password', [
-        # validators.Length(min=8),
-        validate_password,
-        validators.DataRequired(),
-        validators.EqualTo('confirm', message='Passwords must match')
-    ])
+    username = StringField(
+        'Username',
+        [
+            validators.Length(min=1, max=200),
+            # validators.Regexp(re_mxid)
+            validate_username
+        ])
+    password = PasswordField(
+        'New Password',
+        [
+            # validators.Length(min=8),
+            validate_password,
+            validators.DataRequired(),
+            validators.EqualTo('confirm', message='Passwords must match')
+        ])
     confirm = PasswordField('Repeat Password')
     captcha_answer = StringField("Captcha answer", [validate_captcha])
     captcha_token = HiddenField("Captcha token")
@@ -146,7 +139,8 @@ def register():
                                               config.config.server_location,
                                               config.config.shared_secret)
             except exceptions.ConnectionError:
-                logger.error('can not connect to %s' % config.config.server_location,
+                logger.error('can not connect to %s' %
+                             config.config.server_location,
                              exc_info=True)
                 abort(500)
             except exceptions.HTTPError as e:
@@ -176,11 +170,12 @@ def register():
         else:
             logger.debug('account creation failed!')
             captcha_data = captcha.captcha.generate()
-            resp = {'errcode': 'MR_BAD_USER_REQUEST',
-                    'error': form.errors,
-                    "captcha_image": captcha_data["captcha_image"].decode(),
-                    "captcha_token": captcha_data["captcha_token"]
-                    }
+            resp = {
+                'errcode': 'MR_BAD_USER_REQUEST',
+                'error': form.errors,
+                "captcha_image": captcha_data["captcha_image"].decode(),
+                "captcha_token": captcha_data["captcha_token"]
+            }
             return make_response(jsonify(resp), 400)
             # for fieldName, errorMessages in form.errors.items():
             #     for err in errorMessages:
@@ -189,10 +184,11 @@ def register():
         server_name = config.config.server_name
         pw_length = config.config.password['min_length']
         captcha_data = captcha.captcha.generate()
-        return render_template('register.html',
-                               server_name=server_name,
-                               pw_length=pw_length,
-                               riot_instance=config.config.riot_instance,
-                               base_url=config.config.base_url,
-                               captcha_token=captcha_data["captcha_token"],
-                               captcha_image=captcha_data["captcha_image"].decode())
+        return render_template(
+            'register.html',
+            server_name=server_name,
+            pw_length=pw_length,
+            riot_instance=config.config.riot_instance,
+            base_url=config.config.base_url,
+            captcha_token=captcha_data["captcha_token"],
+            captcha_image=captcha_data["captcha_image"].decode())

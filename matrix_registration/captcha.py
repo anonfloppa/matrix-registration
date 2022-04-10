@@ -7,8 +7,7 @@ import string
 import time
 import uuid
 
-
-CAPTCHA_TIMEOUT = 5 # minutes
+CAPTCHA_TIMEOUT = 5  # minutes
 CAPTCHA_LENGTH = 5  # characters
 CAPTCHA_WIDTH = 320
 CAPTCHA_HEIGHT = 94
@@ -26,13 +25,14 @@ class Captcha(db.Model):
 class CaptchaGenerator:
 
     def clean(self):
-        Captcha.query.filter(Captcha.timestamp < (time.time() - CAPTCHA_TIMEOUT * 60)).delete()
+        Captcha.query.filter(
+            Captcha.timestamp < (time.time() - CAPTCHA_TIMEOUT * 60)).delete()
         db.session.commit()
 
     def validate(self, captcha_answer, captcha_token):
         self.clean()
         try:
-            cpt = Captcha.query.filter(Captcha.token==captcha_token).one()
+            cpt = Captcha.query.filter(Captcha.token == captcha_token).one()
         except:
             # when the user stay on the page too long the captcha is removed
             return False
@@ -47,10 +47,12 @@ class CaptchaGenerator:
     def generate(self):
         self.clean()
         captcha_token = str(uuid.uuid4())
-        captcha_answer = (''.join(random.choice(string.ascii_lowercase + string.digits)
+        captcha_answer = (''.join(
+            random.choice(string.ascii_lowercase + string.digits)
             for _ in range(CAPTCHA_LENGTH)))
         image = ImageCaptcha(width=CAPTCHA_WIDTH, height=CAPTCHA_HEIGHT)
-        captcha_image = base64.b64encode(image.generate(captcha_answer).getvalue())
+        captcha_image = base64.b64encode(
+            image.generate(captcha_answer).getvalue())
         timestamp = time.time()
         data = {
             "captcha_image": captcha_image,
@@ -58,13 +60,12 @@ class CaptchaGenerator:
             "captcha_answer": captcha_answer,
             "timestamp": timestamp
         }
-        cpt = Captcha(
-            token=captcha_token,
-            answer=captcha_answer,
-            timestamp=timestamp
-        )
+        cpt = Captcha(token=captcha_token,
+                      answer=captcha_answer,
+                      timestamp=timestamp)
         db.session.add(cpt)
         db.session.commit()
         return data
+
 
 captcha = None

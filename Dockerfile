@@ -1,20 +1,31 @@
 ARG PYTHON_VERSION=3.8
 
-FROM docker.io/python:${PYTHON_VERSION} as builder
+FROM docker.io/python:${PYTHON_VERSION} as base
 
-COPY README.md setup.py config.sample.yaml /tmp/matrix-registration/
-COPY matrix_registration /tmp/matrix-registration/matrix_registration/
+WORKDIR /app
 
-RUN pip install --prefix="/install" --no-warn-script-location \
-		/tmp/matrix-registration[postgres]
+FROM base as builder
+
+ENV POETRY_VERSION=1.1.13
+
+RUN pip install "poetry==$POETRY_VERSION"
+RUN python -m venv /venv
+COPY pyproject.toml poetry.lock matrix_registration ./
+RUN . /venv/bin/activate && poetry install --no-dev --no-root
+
+COPY . .
+RUN . /venv/bin/activate && poetry build
 
 # Runtime
-FROM docker.io/python:${PYTHON_VERSION}
+FROM base as final
 
-COPY --from=builder /install /usr/local
+COPY --from=builder /venv /venv
+COPY --from=builder /app/dist .
+
+RUN . /venv/bin/activate && pip install *.whl
 
 VOLUME ["/data"]
 
 EXPOSE 5000/tcp
 
-ENTRYPOINT ["matrix-registration", "--config-path=/data/config.yaml"]
+ENTRYPOINT ["/venv/bin/matrix-registration", "--config-path=/data/config.yaml"]

@@ -8,19 +8,11 @@ import sys
 import yaml
 
 # Local imports...
-from .constants import (
-    CONFIG_PATH1,
-    CONFIG_PATH2,
-    CONFIG_PATH3,
-    CONFIG_PATH4,
-    CONFIG_PATH5
-)
+from .constants import (CONFIG_PATH1, CONFIG_PATH2, CONFIG_PATH3, CONFIG_PATH4,
+                        CONFIG_PATH5)
+
 CONFIG_PATHS = [
-    CONFIG_PATH1,
-    CONFIG_PATH2,
-    CONFIG_PATH3,
-    CONFIG_PATH4,
-    CONFIG_PATH5
+    CONFIG_PATH1, CONFIG_PATH2, CONFIG_PATH3, CONFIG_PATH4, CONFIG_PATH5
 ]
 CONFIG_SAMPLE_NAME = "config.sample.yaml"
 CONFIG_NAME = 'config.yaml'
@@ -33,6 +25,7 @@ class Config:
 
     loads a dict or a yaml file to be accessible by all files in the module
     """
+
     def __init__(self, data):
         self.data = data
         self.CONFIG_PATH = None
@@ -49,7 +42,7 @@ class Config:
         if type(self.data) is dict:
             logger.debug('from dict...')
             dictionary = self.data
-            config_default = False 
+            config_default = False
         else:
             logger.debug('from file...')
             # check work dir and all other pip install locations for config
@@ -73,7 +66,8 @@ class Config:
                     # check if still no config found
                     if not config_exists:
                         sys.exit('could not find any configuration file!')
-                    self.data = os.path.join(self.CONFIG_PATH, CONFIG_SAMPLE_NAME)
+                    self.data = os.path.join(self.CONFIG_PATH,
+                                             CONFIG_SAMPLE_NAME)
                 else:
                     self.data = os.path.join(self.CONFIG_PATH, CONFIG_NAME)
             try:

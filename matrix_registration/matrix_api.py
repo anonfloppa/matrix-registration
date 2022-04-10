@@ -8,7 +8,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def create_account(user, password, server_location, shared_secret,
+def create_account(user,
+                   password,
+                   server_location,
+                   shared_secret,
                    admin=False):
     """
     creates account
