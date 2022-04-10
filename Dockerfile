@@ -10,7 +10,7 @@ ENV POETRY_VERSION=1.1.13
 
 RUN pip install "poetry==$POETRY_VERSION"
 RUN python -m venv /venv
-COPY pyproject.toml poetry.lock matrix_registration ./
+COPY pyproject.toml poetry.lock config.sample.yaml matrix_registration ./
 RUN . /venv/bin/activate && poetry install --no-dev --no-root
 
 COPY . .
@@ -28,4 +28,4 @@ VOLUME ["/data"]
 
 EXPOSE 5000/tcp
 
-ENTRYPOINT ["/venv/bin/matrix-registration", "--config-path=/data/config.yaml"]
+ENTRYPOINT ["/venv/bin/matrix-registration", "--config-path=/config/config.yaml"]

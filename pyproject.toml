@@ -1,6 +1,6 @@
 [tool.poetry]
 name = 'matrix-registration'
-version = '0.7.2.1'
+version = '0.7.2.2'
 description = 'captcha based matrix registration app'
 authors = ['Jona Abdinghoff (ZerataX) <mail@zera.tax>', 'Big Floppa']
 license = 'MIT'
